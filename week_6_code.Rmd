@@ -1,0 +1,168 @@
+---
+title: "Week 6 Code Along"
+author: "Catherine Takata"
+date: "11/17/2020"
+output: html_document
+---
+
+## Part 0 and Part 1
+attach packages 
+
+```{r setup, include=FALSE, echo=TRUE, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(palmerpenguins)
+library(ggpubr)
+library(broom)
+```
+
+
+## Part 2: A rank-based test exmaple (Mann Whitney U)
+First, let’s create two sample vectors called gp_1 and gp_2. We use set.seed() here to create a “pseudorandom” sample, so that we all get the same samples – otherwise we’d all get something different! We use sample.int() to create random samples with integers from 1 to x, of size = ?, with replacement:
+
+
+```{r}
+set.seed(1414)
+gp_1 <- sample.int(20, size = 15, replace = TRUE)
+
+set.seed(1424)
+gp_2 <- sample.int(30, size = 15, replace = TRUE)
+```
+
+First, always look at it (here, using the base R hist() function to create an exploratory histogram of each – fine if you’re only doing this for a quick look with a vector, but customization can be more challenging than in ggplot):
+
+```{r}
+hist(gp_1)
+```
+
+```{r}
+hist(gp_2)
+```
+
+If I want to compare ranks between gp_1 and gp_2, what are some reasons I might choose a rank-based test?
+
+Not clearly normally distributed from exploratory histograms
+Somewhat small sample size (n = 15 for each)
+I’ve decided that ranks (or, medians) are a more valuable metric to compare for these data.
+
+---- 
+
+Here, we’ll perform Mann-Whitney U to answer “Is there a significant difference in ranks (medians) between gp_1 and gp_2?” using the wilcox.test() function.
+
+```{r}
+my_mwu <- wilcox.test(gp_1, gp_2)
+```
+
+What does that p-value of 0.28 actually mean? It means that if the null hypothesis is true (these samples were drawn from populations with the same median), there is a probability of 0.28 that we could have found median values at least as different as ours by chance. In other words: not sufficient evidence to reject the null hypothesis of equal ranks (or medians) using a significance level of 0.05.
+
+
+## Part 3: Simple Linear Regression
+Here, we’ll explore the relationship between flipper length and body mass for penguins, including all 3 penguin species included in the penguins dataset.
+
+
+### A. Look at it! 
+Let’s make an exploratory scatterplot of penguing flipper length versus body mass (here, we will only use those variables
+
+```{r}
+ggplot(data = penguins, aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point()
+```
+
+Here, it looks like overall a linear relationship between flipper length and body mass makes sense here (moving forward, we’re learn how to include species and sex as part of the model, but for now we’ll just use the single exploratory variable flipper_length_mm).
+
+### B. Model it 
+
+```{r}
+# Linear model, stored as penguin_lm:
+penguin_lm <- lm(body_mass_g ~ flipper_length_mm, data = penguins)
+
+#return the complete overvoew: 
+summary(penguin_lm)
+```
+
+- Both the intercept and flipper_length_mm coefficients are significantly different from zero (not super interesting)
+
+- The Multiple R2 value is 0.759 - meaning that 75.9% of variance in body mass is explained by flipper length
+
+
+### C. Access model outputs 
+We can access the coefficients for the model using:
+- The slope is 49.69 (g / mm)
+- The y-intercept is -5780.83 (g)
+- The full equation is mass = 49.69*(flipper length) + (-5780.83)
+
+We can use the broom::tidy() function to get the model outputs in nice data frame format:
+
+```{r}
+penguin_lm_tidy <- broom::tidy(penguin_lm)
+```
+
+Get the intercepts 
+```{r}
+penguin_int <- penguin_lm_tidy$estimate[1]
+penguin_int
+```
+
+Then to get the flipper_length coffecicnet: 
+```{r}
+penguin_coef <- penguin_lm_tidy$estimate[2]
+penguin_coef
+```
+
+Other model metrics (degrees of freedom, F-statistic, p-value, etc)?
+```{r}
+penguin_lm_out <- broom::glance(penguin_lm)
+penguin_lm_out
+```
+
+Simple linear regression was used to explore the relationship between penguin flipper length (mm) and body mass (g) across all three penguin species, and including both male and female penguins. A significant regression model was found (β = 49.686, F(1,340) = 1070.7, p < 0.001) with an R2 of 0.759.
+
+### D. Explore model assumptions 
+
+Residuals (e.g. normality & homoscedasticity of residuals) 
+- (residual=yactual−ypredicted).
+
+```{r}
+plot(penguin_lm)
+```
+
+Four plots: 
+- The first one: fitted values vs. residuals
+- The second one: QQ-plot for residuals
+- The third one: another way of looking at fitted vs. residuals (these are just standardized residuals, but you can interpret it the same way)
+- The fourth one: Cook’s distance, a measure of “influence” or “leverage” that individual points have on the model - often considered a way to explore outliers.
+
+Plots 1 and 3 are useful for thinking about homoscedasticity. Plot 2 (QQ plot) helps us consider normality of residuals. Plot 4 reveals the Cook's distance (a measure of how much leverage any single observation has on the model).
+
+### E. Visualize the model 
+- Use geom_smooth(method = "lm") to add a linear model to an existing scatterplot
+
+- Use stat_cor() and/or stat_regline_equation() to add equation information directly to the plot panel, at an x- and y-position that you specify (and yes, you can mess with the digits & appearance here)
+
+```{r}
+ggplot(data = penguins, aes(x = flipper_length_mm, y = body_mass_g)) + 
+  geom_point(size = 2) +
+  geom_smooth(method = "lm",
+              color = "red",
+              size = 0.5,
+              fill = "gray10",
+              alpha = 0.5) +
+  theme_light() + 
+  ggpubr::stat_regline_equation(label.x = 180, label.y = 5700)
+```
+
+
+### F. Find Pearson's r for correlatoin: 
+We might also want to explore the strength of the correlation (degree of relationship) between two variables which, for two linearly related continuous variables, can be expressed using Pearson’s r.
+
+Pearson’s r ranges in value from -1 (perfectly negatively correlated - as one variable increases the other decreases) to 1 (perfectly positively correlated - as one variable increases the other increases). A correlation of 0 means that there is no degree of relationship between the two variables.
+
+We’ll use the cor.test() function, adding the two vectors (flipper_length_mm and body_mass_g) as the arguments. The function reports the Pearson’s r value, and performs a hypothesis test with null hypothesis that the correlation = 0.
+```{r}
+penguins_cor <- cor.test(penguins$flipper_length_mm, penguins$body_mass_g)
+penguins_cor
+```
+
+Here, we see that there is a strong positive correlation between penguin flipper length and body mass (r = 0.87, t(340) = 32.72, p < 0.001).
+
+
